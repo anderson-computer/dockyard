@@ -135,7 +135,7 @@ install_packages() {
   dnf install -y epel-release &>>"$LOG_FILE" || warn "EPEL already installed or unavailable"
   dnf install -y \
     dnsmasq nginx \
-    python3 python3-pip python3-venv \
+    python3 python3-pip \
     gcc make perl xz-devel binutils \
     genisoimage isomd5sum \
     tftp-server \
