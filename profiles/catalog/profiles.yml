@@ -1,0 +1,62 @@
+schema_version: "1.0"
+profiles:
+  - id: server-core
+    label: Server Core
+    supported_os:
+      - rocky-9.7
+      - rocky-10.1
+    default_capabilities:
+      - join-freeipa-client
+      - register-dns
+    description: Baseline headless server with firstboot bootstrap and optional capability layering.
+  - id: workstation-admin
+    label: Admin Workstation
+    supported_os:
+      - rocky-9.7
+      - rocky-10.1
+    default_capabilities:
+      - join-freeipa-client
+      - register-dns
+      - monitoring-librenms-client
+    description: Administrative workstation baseline with bootstrap tooling and identity integration.
+  - id: freeipa-server
+    label: FreeIPA Server
+    supported_os:
+      - rocky-9.7
+    default_capabilities:
+      - register-dns
+    description: Dedicated FreeIPA primary server profile. Keep separate from client enrollment behavior.
+  - id: freeipa-replica
+    label: FreeIPA Replica
+    supported_os:
+      - rocky-9.7
+    default_capabilities:
+      - register-dns
+    description: FreeIPA replica profile with realm-aware post-install orchestration.
+  - id: dns-server
+    label: DNS Server
+    supported_os:
+      - rocky-9.7
+      - rocky-10.1
+    default_capabilities:
+      - register-dns
+    description: Authoritative DNS server profile intended for BIND-based capability bundles.
+  - id: openfire-server
+    label: Openfire Server
+    supported_os:
+      - rocky-9.7
+      - rocky-10.1
+    default_capabilities:
+      - join-freeipa-client
+      - register-dns
+      - service-openfire
+    description: XMPP application server profile with room for FreeIPA-backed provisioning.
+  - id: webapps-server
+    label: Web Applications Server
+    supported_os:
+      - rocky-9.7
+      - rocky-10.1
+    default_capabilities:
+      - join-freeipa-client
+      - register-dns
+    description: Generic multi-application web host profile that composes app capabilities.

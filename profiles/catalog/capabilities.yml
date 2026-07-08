@@ -1,0 +1,46 @@
+schema_version: "1.0"
+capabilities:
+  - id: join-freeipa-client
+    label: Join FreeIPA Client
+    order: 20
+    requires_profiles: []
+    description: Enroll the node as a FreeIPA client when realm and enrollment data are present.
+  - id: register-dns
+    label: Register DNS
+    order: 30
+    requires_profiles: []
+    description: Register forward and reverse DNS records using the configured provider.
+  - id: monitoring-librenms-client
+    label: LibreNMS Client
+    order: 40
+    requires_profiles: []
+    description: Configure the node for LibreNMS client-side monitoring.
+  - id: service-openfire
+    label: Openfire Service
+    order: 60
+    requires_profiles:
+      - server-core
+      - openfire-server
+      - webapps-server
+    description: Apply the Openfire server stack using lrn-ansible wrappers around the existing service playbook.
+  - id: service-wikijs
+    label: Wiki.js Service
+    order: 70
+    requires_profiles:
+      - server-core
+      - webapps-server
+    description: Apply the Wiki.js service stack.
+  - id: service-netbox
+    label: NetBox Service
+    order: 80
+    requires_profiles:
+      - server-core
+      - webapps-server
+    description: Apply the NetBox service stack.
+  - id: service-guacamole
+    label: Guacamole Service
+    order: 90
+    requires_profiles:
+      - server-core
+      - webapps-server
+    description: Apply the Guacamole service stack.
