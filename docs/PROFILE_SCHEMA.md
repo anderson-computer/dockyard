@@ -1,6 +1,6 @@
 # LRN PXE Profile and Capability Schema
 
-This document defines the profile model that `lrn-pxe` should use when generating
+This document defines the profile model that `dockyard` should use when generating
 menu entries and unattended install manifests.
 
 ## Design goals
@@ -127,7 +127,7 @@ Rules:
 
 ## Menu generation guidance
 
-`lrn-pxe` should present menu choices as profile-driven presets, not as a flat list
+`dockyard` should present menu choices as profile-driven presets, not as a flat list
 of low-level toggles.
 
 Recommended first-layer menu examples:
@@ -153,3 +153,4 @@ Each menu entry should map to:
 - The manifest is the contract between PXE and `lrn-ansible`.
 - FreeIPA server and FreeIPA replica should remain separate profiles.
 - DNS registration and FreeIPA client enrollment should stay optional capabilities.
+

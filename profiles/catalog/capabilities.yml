@@ -44,3 +44,4 @@ capabilities:
       - server-core
       - webapps-server
     description: Apply the Guacamole service stack.
+

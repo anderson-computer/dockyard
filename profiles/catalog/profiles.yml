@@ -60,3 +60,4 @@ profiles:
       - join-freeipa-client
       - register-dns
     description: Generic multi-application web host profile that composes app capabilities.
+

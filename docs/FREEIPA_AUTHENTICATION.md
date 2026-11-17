@@ -2,12 +2,12 @@
 
 ## Overview
 
-This guide explains how to integrate LRN_PXE with FreeIPA/LDAP authentication for centralized user management and access control.
+This guide explains how to integrate Dockyard with FreeIPA/LDAP authentication for centralized user management and access control.
 
 ## Architecture
 
 ```
-LRN_PXE Web UI (Port 80/443)
+Dockyard Web UI (Port 80/443)
         ↓
   Flask + Auth Middleware
         ↓
@@ -22,8 +22,8 @@ LRN_PXE Web UI (Port 80/443)
 
 1. **FreeIPA Server** running and accessible
 2. **Administrator credentials** for LDAP queries
-3. **FreeIPA group** for LRN_PXE admins (recommended: `lrn-pxe-admins`)
-4. **Network connectivity** between LRN_PXE and FreeIPA servers
+3. **FreeIPA group** for Dockyard admins (recommended: `dockyard-admins`)
+4. **Network connectivity** between Dockyard and FreeIPA servers
 
 ## Setup Instructions
 
@@ -31,23 +31,23 @@ LRN_PXE Web UI (Port 80/443)
 
 Create the admin group:
 ```bash
-ipa group-add lrn-pxe-admins --desc="LRN_PXE Administrators"
+ipa group-add dockyard-admins --desc="Dockyard Administrators"
 ```
 
 Add admin users:
 ```bash
-ipa group-add-member lrn-pxe-admins --users=admin,john,sarah
+ipa group-add-member dockyard-admins --users=admin,john,sarah
 ```
 
 Create optional operator group:
 ```bash
-ipa group-add lrn-pxe-operators --desc="LRN_PXE Operators"
-ipa group-add-member lrn-pxe-operators --users=operator1,operator2
+ipa group-add dockyard-operators --desc="Dockyard Operators"
+ipa group-add-member dockyard-operators --users=operator1,operator2
 ```
 
 ### Step 2: Update Settings
 
-Edit `/opt/lrn_pxe/config/settings.json`:
+Edit `/opt/dockyard/config/settings.json`:
 
 ```json
 {
@@ -57,7 +57,7 @@ Edit `/opt/lrn_pxe/config/settings.json`:
   "ldap_base_dn": "dc=example,dc=com",
   "ldap_admin_dn": "uid=admin,cn=users,cn=accounts,dc=example,dc=com",
   "ldap_admin_password": "${LDAP_ADMIN_PASSWORD}",
-  "ldap_admin_group": "lrn-pxe-admins",
+  "ldap_admin_group": "dockyard-admins",
   "ldap_timeout": 10,
   "session_timeout": 3600,
   "require_https": false,
@@ -69,7 +69,7 @@ Edit `/opt/lrn_pxe/config/settings.json`:
 **Important:** Set `ldap_admin_password` via environment variable:
 ```bash
 export LDAP_ADMIN_PASSWORD="your-admin-password"
-lrn-pxe restart
+dockyard restart
 ```
 
 ### Step 3: Install Dependencies
@@ -83,8 +83,8 @@ pip install python-ldap>=3.4.0
 
 Set environment variable:
 ```bash
-export LRN_PXE_AUTH_ENABLED=true
-systemctl restart lrn-pxe
+export Dockyard_AUTH_ENABLED=true
+systemctl restart dockyard
 ```
 
 ## Usage
@@ -97,24 +97,24 @@ systemctl restart lrn-pxe
 4. After successful auth, you'll see the dashboard
 
 **Permissions:**
-- **Admins** (members of `lrn-pxe-admins`): Full access to all features
+- **Admins** (members of `dockyard-admins`): Full access to all features
 - **Others**: Read-only access to boot menu (coming in future releases)
 
 ### For Administrators
 
 #### Add New Admin User
 ```bash
-ipa group-add-member lrn-pxe-admins --users=newuser
+ipa group-add-member dockyard-admins --users=newuser
 ```
 
 #### Remove Admin User
 ```bash
-ipa group-remove-member lrn-pxe-admins --users=olduser
+ipa group-remove-member dockyard-admins --users=olduser
 ```
 
 #### View All Admin Users
 ```bash
-ipa group-show lrn-pxe-admins
+ipa group-show dockyard-admins
 ```
 
 #### Check User Group Membership
@@ -203,7 +203,7 @@ ipa user-show --all someuser | grep "Member of"
 
 2. Restart application after adding to group:
    ```bash
-   systemctl restart lrn-pxe
+   systemctl restart dockyard
    ```
 
 3. Clear browser cookies and log back in
@@ -220,7 +220,7 @@ ipa user-show --all someuser | grep "Member of"
 
 2. Restart service:
    ```bash
-   systemctl restart lrn-pxe
+   systemctl restart dockyard
    ```
 
 ## API Authentication
@@ -269,7 +269,7 @@ LDAP_USER_ATTRIBUTES = [
 
 ```python
 # Support multiple admin groups (modify auth.py)
-admin_groups = ['lrn-pxe-admins', 'infrastructure-team']
+admin_groups = ['dockyard-admins', 'infrastructure-team']
 is_admin = any(group in user_groups for group in admin_groups)
 ```
 
@@ -298,30 +298,30 @@ def login():
 
 ```bash
 # View recent logins
-tail -50 /opt/lrn_pxe/logs/auth.log
+tail -50 /opt/dockyard/logs/auth.log
 
 # Filter successful logins
-grep "Authentication successful" /opt/lrn_pxe/logs/auth.log
+grep "Authentication successful" /opt/dockyard/logs/auth.log
 
 # Filter failed attempts
-grep "Authentication failed" /opt/lrn_pxe/logs/auth.log
+grep "Authentication failed" /opt/dockyard/logs/auth.log
 ```
 
 ### Audit Trail
 
 All administrative actions are logged:
 ```bash
-grep "admin action" /opt/lrn_pxe/logs/app.log
+grep "admin action" /opt/dockyard/logs/app.log
 ```
 
 ### Monitor Failed Logins
 
 ```bash
 # Recent failed attempts
-tail -100 /opt/lrn_pxe/logs/auth.log | grep "failed"
+tail -100 /opt/dockyard/logs/auth.log | grep "failed"
 
 # Count failed attempts by user
-grep "failed" /opt/lrn_pxe/logs/auth.log | awk -F: '{print $NF}' | sort | uniq -c
+grep "failed" /opt/dockyard/logs/auth.log | awk -F: '{print $NF}' | sort | uniq -c
 ```
 
 ## Migration Path
@@ -353,7 +353,7 @@ Then restart service. Previous sessions will still be valid.
 - **FreeIPA Documentation:** https://access.redhat.com/documentation/en-us/red_hat_enterprise_linux/9/html/installing_identity_management/index
 - **LDAP RFC 4511:** https://tools.ietf.org/html/rfc4511
 - **Flask-LDAP Documentation:** https://github.com/uxsolutions/flask-ldapconn
-- **LRN_PXE Issues:** https://github.com/your-org/lrn-pxe/issues
+- **Dockyard Issues:** https://github.com/your-org/dockyard/issues
 
 ## What's Next
 
@@ -365,3 +365,4 @@ Planned enhancements:
 - [ ] SAML/SSO integration
 - [ ] Token-based API authentication (JWT)
 - [ ] Audit log export and analysis
+

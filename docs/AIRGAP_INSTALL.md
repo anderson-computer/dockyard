@@ -1,6 +1,6 @@
-# LRN_PXE Airgapped / Offline Installation Guide
+# Dockyard Airgapped / Offline Installation Guide
 
-This guide covers installing LRN_PXE on a **Rocky Linux 9/10 server with no internet access**.
+This guide covers installing Dockyard on a **Rocky Linux 9/10 server with no internet access**.
 
 ---
 
@@ -20,7 +20,7 @@ fetch-bundle.sh                 SCP / USB / share          install-offline.sh
   ↓
 create-airgap-package.sh
   ↓
-lrn_pxe_offline_v1.0.0.tar.gz
+dockyard_offline_v1.0.0.tar.gz
 ```
 
 ---
@@ -35,14 +35,14 @@ You need a Rocky Linux 9 or 10 machine **with internet access** to build the bun
 sudo dnf install -y createrepo_c python3-pip rsync
 ```
 
-### Download the LRN_PXE repository
+### Download the Dockyard repository
 
 ```bash
 # If you have git:
 git clone https://github.com/your-org/mac-ops.git
-cd mac-ops/lrn_pxe
+cd mac-ops/dockyard
 
-# Or copy the lrn_pxe/ folder to the machine by USB/share
+# Or copy the dockyard/ folder to the machine by USB/share
 ```
 
 ### Run the bundle fetcher
@@ -65,7 +65,7 @@ This downloads and saves locally:
 bash create-airgap-package.sh
 ```
 
-This produces `lrn_pxe_offline_v1.0.0.tar.gz` in the parent directory and a `.sha256` checksum file.
+This produces `dockyard_offline_v1.0.0.tar.gz` in the parent directory and a `.sha256` checksum file.
 
 ---
 
@@ -76,20 +76,20 @@ Transfer the tarball to your airgapped Rocky Linux server via any available meth
 ### Option A — SCP (if you have a jump host or brief network access)
 
 ```bash
-scp lrn_pxe_offline_v1.0.0.tar.gz admin@192.168.1.10:/tmp/
-scp lrn_pxe_offline_v1.0.0.tar.gz.sha256 admin@192.168.1.10:/tmp/
+scp dockyard_offline_v1.0.0.tar.gz admin@192.168.1.10:/tmp/
+scp dockyard_offline_v1.0.0.tar.gz.sha256 admin@192.168.1.10:/tmp/
 ```
 
 ### Option B — USB drive
 
 ```bash
 # Copy to USB (on internet machine)
-cp lrn_pxe_offline_v1.0.0.tar.gz /media/usb/
-cp lrn_pxe_offline_v1.0.0.tar.gz.sha256 /media/usb/
+cp dockyard_offline_v1.0.0.tar.gz /media/usb/
+cp dockyard_offline_v1.0.0.tar.gz.sha256 /media/usb/
 
 # Mount USB on target server and copy
 mount /dev/sdb1 /mnt/usb
-cp /mnt/usb/lrn_pxe_offline_v1.0.0.tar.gz /tmp/
+cp /mnt/usb/dockyard_offline_v1.0.0.tar.gz /tmp/
 ```
 
 ### Option C — NFS / SMB share
@@ -102,8 +102,8 @@ On the target server, before installing:
 
 ```bash
 cd /tmp
-sha256sum -c lrn_pxe_offline_v1.0.0.tar.gz.sha256
-# Should output: lrn_pxe_offline_v1.0.0.tar.gz: OK
+sha256sum -c dockyard_offline_v1.0.0.tar.gz.sha256
+# Should output: dockyard_offline_v1.0.0.tar.gz: OK
 ```
 
 ---
@@ -114,9 +114,9 @@ On the **airgapped Rocky Linux 9/10 target**:
 
 ```bash
 cd /tmp
-tar -xzf lrn_pxe_offline_v1.0.0.tar.gz
-cd lrn_pxe_offline_v1.0.0
-sudo bash lrn_pxe/install-offline.sh
+tar -xzf dockyard_offline_v1.0.0.tar.gz
+cd dockyard_offline_v1.0.0
+sudo bash dockyard/install-offline.sh
 ```
 
 The installer will:
@@ -144,7 +144,7 @@ The installer will:
 
 ## Offline Web UI
 
-After installing in offline mode, the web UI uses the **bundled Bootstrap and Bootstrap Icons** stored in `/opt/lrn_pxe/web/static/vendor/`. There are no external CDN requests at runtime.
+After installing in offline mode, the web UI uses the **bundled Bootstrap and Bootstrap Icons** stored in `/opt/dockyard/web/static/vendor/`. There are no external CDN requests at runtime.
 
 The templates use a graceful fallback strategy:
 - First, load from `/static/vendor/bootstrap.min.css`
@@ -163,7 +163,7 @@ If you need to update RPMs or Python packages after initial install:
 sudo dnf localinstall --disablerepo='*' /path/to/new/rpms/*.rpm
 
 # Update Python packages from new wheels
-sudo /opt/lrn_pxe/venv/bin/pip install \
+sudo /opt/dockyard/venv/bin/pip install \
   --no-index \
   --find-links=/path/to/new/wheels \
   flask flask-cors --upgrade
@@ -196,12 +196,12 @@ The pip wheels may not be compatible with the Python version on the target syste
 The vendor assets may not have been copied correctly. Check:
 
 ```bash
-ls /opt/lrn_pxe/web/static/vendor/
+ls /opt/dockyard/web/static/vendor/
 # Should show: bootstrap.min.css  bootstrap.bundle.min.js  bootstrap-icons.min.css  fonts/
 
 # Fix by manually copying from bundle:
-cp -r /path/to/bundle/vendor/. /opt/lrn_pxe/web/static/vendor/
-systemctl restart lrn-pxe
+cp -r /path/to/bundle/vendor/. /opt/dockyard/web/static/vendor/
+systemctl restart dockyard
 ```
 
 ---
@@ -213,5 +213,6 @@ systemctl restart lrn-pxe
 - After installation, remove the bundle tarball from the target server if disk space is a concern — it is not needed for operation.
 
 ```bash
-rm -f /tmp/lrn_pxe_offline_v1.0.0.tar.gz
+rm -f /tmp/dockyard_offline_v1.0.0.tar.gz
 ```
+

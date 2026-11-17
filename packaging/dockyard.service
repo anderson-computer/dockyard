@@ -1,0 +1,29 @@
+[Unit]
+Description=Dockyard network boot management
+Documentation=file:///opt/dockyard/docs/INSTALL.md
+After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
+
+[Service]
+Type=simple
+User=dockyard
+Group=dockyard
+WorkingDirectory=/opt/dockyard/web
+Environment=DOCKYARD_DIR=/var/lib/dockyard
+Environment=DOCKYARD_CONFIG=/etc/dockyard
+Environment=DOCKYARD_PORT=8080
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/opt/dockyard/venv/bin/gunicorn --workers 1 --threads 8 --bind 127.0.0.1:8080 --timeout 1800 app:app
+Restart=on-failure
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/dockyard
+RestrictSUIDSGID=true
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target

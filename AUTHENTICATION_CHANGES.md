@@ -152,7 +152,7 @@ def update_menu():
   "ldap_base_dn": "dc=example,dc=com",
   "ldap_admin_dn": "uid=admin,cn=users,cn=accounts,dc=example,dc=com",
   "ldap_admin_password": "${LDAP_ADMIN_PASSWORD}",
-  "ldap_admin_group": "lrn-pxe-admins",
+  "ldap_admin_group": "dockyard-admins",
   "ldap_timeout": 10,
   "session_timeout": 3600,
   "require_https": false
@@ -162,8 +162,8 @@ def update_menu():
 ### Environment Variables
 ```bash
 export LDAP_ADMIN_PASSWORD="your-password"
-export LRN_PXE_AUTH_ENABLED=true
-export LRN_PXE_SESSION_TIMEOUT=7200
+export Dockyard_AUTH_ENABLED=true
+export Dockyard_SESSION_TIMEOUT=7200
 ```
 
 ## Testing Checklist
@@ -222,6 +222,7 @@ The feature is designed as optional:
 For questions or issues:
 1. Check docs/FREEIPA_AUTHENTICATION.md
 2. Review troubleshooting section
-3. Check application logs: `/opt/lrn_pxe/logs/`
+3. Check application logs: `/opt/dockyard/logs/`
 4. Contact system administrator
 5. Open GitHub issue with details
+

@@ -1,39 +1,9 @@
-# Python
 __pycache__/
-*.py[cod]
-*.pyo
-*.pyd
-.Python
-*.egg-info/
-dist/
-build/
-.eggs/
+*.pyc
+*.log
 .venv/
 venv/
-env/
-
-# PXE runtime artefacts — never commit ISOs or built bundles
-isos/
-tftp/
-www/
-kickstarts/*.cfg
-!kickstarts/.gitkeep
-
-# Airgap bundle output
-pip-packages/
-*.tar.gz
-*.tar.bz2
-*.zip
-
-# Logs & runtime state
-*.log
-*.pid
-
-# Editor / OS
-.DS_Store
-Thumbs.db
-.idea/
-.vscode/
-*.swp
-*.swo
-*~
+releases/
+dockyard-state/
+*.key
+*.iso
