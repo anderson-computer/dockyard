@@ -31,8 +31,9 @@ operating-system licenses are supplied by the operator.
 - [Technical specification](docs/SPEC_SHEET.md)
 - [Third-party notices](THIRD_PARTY_NOTICES.md)
 
-The original user/authentication guides are retained for background; the new
-installation and review documents take precedence where commands have changed.
+See the [operator guide](docs/USER_GUIDE.md), [ICD](docs/ICD.md),
+[offline build guide](docs/AIRGAP_INSTALL.md) and
+[identity guide](docs/FREEIPA_AUTHENTICATION.md) for additional detail.
 
 ## Build
 
