@@ -58,7 +58,7 @@
            style="border-bottom:1px solid var(--card-border);" id="svc-row-{{ svc }}">
         <div>
           <div style="font-size:14px;font-weight:600;color:var(--text-primary);">
-            {% if svc == 'lrn-pxe' %}Web Interface
+            {% if svc == 'dockyard' %}Web Interface
             {% elif svc == 'dnsmasq' %}DHCP / TFTP
             {% else %}HTTP Server{% endif %}
           </div>
@@ -153,8 +153,8 @@
         <div class="col-sm-4">
           <div style="font-size:12px;color:var(--sidebar-text);margin-bottom:4px;">Web UI</div>
           <div style="font-size:15px;font-weight:600;font-family:monospace;">
-            <a href="http://{{ settings.server_ip }}/" target="_blank" style="color:var(--brand-color);">
-              http://{{ settings.server_ip }}/
+            <a href="{{ request.url_root }}" style="color:var(--brand-color);">
+              {{ request.url_root }}
             </a>
           </div>
         </div>
@@ -162,7 +162,7 @@
           <div style="font-size:12px;color:var(--sidebar-text);margin-bottom:4px;">iPXE Boot Menu URL</div>
           <div style="font-size:15px;font-weight:600;font-family:monospace;">
             <a href="/menu.ipxe" target="_blank" style="color:var(--brand-color);">
-              http://{{ settings.server_ip }}/menu.ipxe
+              http://{{ settings.server_ip }}:{{ settings.boot_port|default(8081) }}/menu.ipxe
             </a>
           </div>
         </div>
@@ -175,7 +175,7 @@
         <div class="col-sm-4">
           <div style="font-size:12px;color:var(--sidebar-text);margin-bottom:4px;">TFTP Root</div>
           <div style="font-size:14px;font-weight:600;font-family:monospace;color:var(--text-primary);">
-            /var/lib/tftpboot
+            /var/lib/dockyard/tftp
           </div>
         </div>
         <div class="col-sm-4">
@@ -244,3 +244,4 @@ async function restartService(name) {
 }
 </script>
 {% endblock %}
+

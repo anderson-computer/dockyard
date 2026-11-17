@@ -23,7 +23,7 @@
       <div class="lrn-form-group">
         <label>Menu Title</label>
         <input type="text" class="lrn-input" id="menuTitle"
-               value="{{ menu.title }}" placeholder="LRN_PXE Boot Menu">
+               value="{{ menu.title }}" placeholder="Dockyard Boot Menu">
       </div>
       <div class="lrn-form-group">
         <label>Auto-boot Timeout <span style="color:var(--sidebar-text);font-weight:400;">(seconds, 0 = wait forever)</span></label>
@@ -142,12 +142,12 @@
             </label>
             <!-- Edit button -->
             <button class="btn-lrn ghost" style="font-size:12px;padding:5px 8px;"
-                    onclick="editEntry('{{ entry.id }}', {{ entry|tojson }})">
+                    onclick="editEntry('{{ entry.id }}', {{ entry|tojson|forceescape }})">
               <i class="bi bi-pencil-fill"></i>
             </button>
             <!-- Delete button -->
             <button class="btn-lrn danger" style="font-size:12px;padding:5px 8px;"
-                    onclick="deleteEntry('{{ entry.id }}', '{{ entry.label }}')">
+                    onclick="deleteEntry({{ entry.id|tojson|forceescape }}, {{ entry.label|tojson|forceescape }})">
               <i class="bi bi-trash3"></i>
             </button>
           </div>
@@ -257,7 +257,7 @@ async function refreshPreview() {
 
 async function saveMenuSettings() {
   const menu = await api('GET', '/api/menu');
-  menu.title   = document.getElementById('menuTitle').value.trim() || 'LRN_PXE Boot Menu';
+  menu.title   = document.getElementById('menuTitle').value.trim() || 'Dockyard Boot Menu';
   menu.timeout = parseInt(document.getElementById('menuTimeout').value) || 60;
   menu.default = document.getElementById('menuDefault').value;
   try {
@@ -334,3 +334,4 @@ async function deleteEntry(id, label) {
 }
 </script>
 {% endblock %}
+

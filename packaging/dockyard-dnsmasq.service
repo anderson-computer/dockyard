@@ -1,0 +1,13 @@
+[Unit]
+Description=Dockyard explicitly configured DHCP/TFTP service
+After=network.target
+ConditionPathExists=/etc/dockyard/dnsmasq.conf
+
+[Service]
+Type=simple
+ExecStartPre=/usr/sbin/dnsmasq --test --conf-file=/etc/dockyard/dnsmasq.conf
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/dockyard/dnsmasq.conf
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

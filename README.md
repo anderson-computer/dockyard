@@ -1,110 +1,48 @@
-# LRN_PXE — Network Boot Server
+# Dockyard
 
-A complete, self-hosted PXE boot environment for Rocky Linux 9/10. Deploy operating systems to any machine on your network — no USB drives, no DVDs — through a modern web interface.
+PXE network boot and provisioning management for Rocky Linux 9 and 10.
+Formerly LRN-PXE. Author: Mike Anderson. Version 1.0.0.
 
----
+Dockyard provides authenticated ISO management, userspace ISO extraction,
+kickstart editing and BIOS/UEFI iPXE menu generation. The management service
+runs without root privileges and listens on loopback. DHCP/TFTP and boot HTTP
+are configured and activated explicitly by a server administrator.
 
-## Features
+## Install
 
-- **Web Management UI** — Add ISOs, create kickstarts, and build boot menus from your browser
-- **BIOS + UEFI support** — Automatically serves the right iPXE binary to any client
-- **Kickstart automation** — Link kickstart files to boot entries for fully unattended installs
-- **Dynamic menu** — Boot menu updates instantly when you make changes
-- **CLI tool** — Full `lrn-pxe` command for server-side management
-- **iPXE from source** — Built from the bundled iPXE source (commit bd13697)
+Use the complete Rocky 9 or 10 x86_64 offline bundle from the repository's
+Releases page. Extract into a new directory and run `sudo bash install.sh`.
+Read `/var/lib/dockyard/admin.password` privately as root, then enable the
+management app with `sudo systemctl enable --now dockyard`. Open
+http://127.0.0.1:8080 on the server, or use an SSH tunnel.
 
----
-
-## Quick Start
-
-**1. Copy to your Rocky Linux 9/10 server and run:**
-```bash
-sudo bash install.sh
-```
-
-**2. Follow the prompts** (network interface, DHCP range, server IP)
-
-**3. Open the web interface:**
-```
-http://<your-server-ip>/
-```
-
-**4. Add a boot image** → Extract boot files → Add to menu → Boot a client
-
----
+Installation does not activate DHCP, TFTP or boot HTTP and does not overwrite
+existing dnsmasq/nginx configurations. See [installation](docs/INSTALL.md) before
+activating provisioning on an authorized isolated network. ISO files and client
+operating-system licenses are supplied by the operator.
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [USER_GUIDE.md](docs/USER_GUIDE.md) | Complete walkthrough for all features |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Common problems and fixes |
-| [SPEC_SHEET.md](docs/SPEC_SHEET.md) | Technical specifications and API reference |
+- [Embedded help](HELP.md), available in-app with F1
+- [Installation and network activation](docs/INSTALL.md)
+- [Code review and validation](docs/CODE_REVIEW.md)
+- [Migration from LRN-PXE](docs/MIGRATION.md)
+- [Release notes](RELEASE_NOTES.md)
+- [Technical specification](docs/SPEC_SHEET.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
 
----
+See the [operator guide](docs/USER_GUIDE.md), [ICD](docs/ICD.md),
+[offline build guide](docs/AIRGAP_INSTALL.md) and
+[identity guide](docs/FREEIPA_AUTHENTICATION.md) for additional detail.
 
-## Project Structure
+## Build
 
-```
-lrn_pxe/
-├── install.sh              # Main installer
-├── configs/                # Config templates
-│   └── ipxe/              # iPXE boot scripts
-├── scripts/
-│   └── lrn-pxe-cli.sh     # CLI management tool
-├── web/
-│   ├── app.py              # Flask web application
-│   ├── run_dev.py          # Local development runner
-│   ├── templates/          # HTML templates (Bootstrap 5)
-│   └── static/             # CSS and JavaScript
-├── systemd/
-│   └── lrn-pxe.service    # systemd service unit
-└── docs/
-    ├── USER_GUIDE.md
-    ├── TROUBLESHOOTING.md
-    └── SPEC_SHEET.md
-```
+`bash build.sh 9 10` uses Podman, or set `CONTAINER_ENGINE=docker`. A connected
+build host prepares matching wheels, signed OS dependency repositories and
+iPXE firmware from the pinned source revision. Target installs never contact
+online repositories. See `packaging/IPXE_COMMIT` for the iPXE revision; its full
+source archive is included with the application. Physical BIOS/UEFI and site
+LDAP/SELinux qualification remain deployment checks. RPMs are unsigned.
 
----
-
-## Architecture
-
-```
-PXE Client  ──DHCP──►  dnsmasq  (port 67/UDP)
-            ◄─IP+Boot─
-            ──TFTP──►  dnsmasq  (port 69/UDP)  →  /var/lib/tftpboot/ipxe/
-            ◄─iPXE──
-            ──HTTP──►  nginx    (port 80/TCP)   →  Flask (port 8080)
-            ◄─menu──                            →  /opt/lrn_pxe/
-```
-
----
-
-## Service Management
-
-```bash
-lrn-pxe status         # Check all services
-lrn-pxe restart        # Restart everything
-lrn-pxe logs           # Tail web UI logs
-lrn-pxe logs dhcp      # Tail DHCP/TFTP logs
-
-systemctl status lrn-pxe    # Web UI service
-systemctl status dnsmasq    # DHCP + TFTP
-systemctl status nginx      # HTTP server
-```
-
----
-
-## Requirements
-
-- Rocky Linux 9.x or 10.x (x86_64)
-- Root / sudo access
-- Static IP address
-- 50 GB+ disk space (for ISOs)
-- No other DHCP server on the same network segment
-
----
-
-## iPXE Source
-
-The bundled iPXE source (`iPXE/ipxe-bd13697/`) is used to build custom BIOS and UEFI boot images with an embedded chainload URL pointing to the LRN_PXE menu endpoint. iPXE is licensed under GPL v2 / UBDL.
+Source copyright remains with its owner. No new open-source license grant is
+inferred from the original repository. Third-party components retain their own licenses.

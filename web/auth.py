@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 """
-FreeIPA/LDAP Authentication Module for LRN_PXE
+FreeIPA/LDAP Authentication Module for Dockyard
 
 Provides LDAP authentication, group membership checks, and user info retrieval
 for integration with FreeIPA identity management systems.
 """
 
 import ldap
+import ldap.dn
+import ldap.filter
+from urllib.parse import urlsplit
 import logging
 from typing import Optional, Dict, List, Tuple
 
@@ -20,7 +23,7 @@ class FreeIPAAuth:
         self,
         server: str,
         base_dn: str,
-        admin_group: str = "lrn-pxe-admins",
+        admin_group: str = "dockyard-admins",
         timeout: int = 10
     ):
         """
@@ -29,7 +32,7 @@ class FreeIPAAuth:
         Args:
             server: LDAP server hostname/IP (e.g., "ipa.example.com")
             base_dn: Base distinguished name (e.g., "dc=example,dc=com")
-            admin_group: FreeIPA group for admins (default: "lrn-pxe-admins")
+            admin_group: FreeIPA group for admins (default: "dockyard-admins")
             timeout: LDAP connection timeout in seconds (default: 10)
         """
         self.server = server
@@ -54,7 +57,18 @@ class FreeIPAAuth:
             ldap.LDAPError: Connection or binding failed
         """
         try:
-            conn = ldap.initialize(f"ldap://{self.server}")
+            if bind_dn is not None and not password:
+                raise ldap.LDAPError('Empty bind password rejected')
+            uri = self.server if '://' in self.server else 'ldap://' + self.server
+            parsed = urlsplit(uri)
+            if parsed.scheme not in ('ldap','ldaps') or not parsed.hostname or parsed.username or parsed.password:
+                raise ldap.LDAPError('Invalid directory URI')
+            conn = ldap.initialize(uri)
+            conn.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+            conn.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_DEMAND)
+            conn.set_option(ldap.OPT_X_TLS_NEWCTX, 0)
+            if parsed.scheme == 'ldap':
+                conn.start_tls_s()
             conn.set_option(ldap.OPT_NETWORK_TIMEOUT, self.timeout)
             
             if bind_dn and password:
@@ -81,7 +95,7 @@ class FreeIPAAuth:
             True if authentication successful, False otherwise
         """
         try:
-            user_dn = f"uid={username},cn=users,cn=accounts,{self.base_dn}"
+            user_dn = f"uid={ldap.dn.escape_dn_chars(username)},cn=users,cn=accounts,{self.base_dn}"
             conn = self._get_connection(user_dn, password)
             conn.unbind_s()
             logger.info(f"Authentication successful for user: {username}")
@@ -94,6 +108,22 @@ class FreeIPAAuth:
             logger.error(f"LDAP error during authentication for {username}: {e}")
             return False
     
+    def authenticate_admin(self, username, password):
+        if not username or not password:
+            return False
+        conn = None
+        try:
+            dn = 'uid=' + ldap.dn.escape_dn_chars(username) + ',cn=users,cn=accounts,' + self.base_dn
+            conn = self._get_connection(dn, password)
+            records = conn.search_s(dn, ldap.SCOPE_BASE, '(objectClass=*)', ['memberOf'])
+            expected = 'cn=' + ldap.dn.escape_dn_chars(self.admin_group) + ',' + self.groups_dn
+            return bool(records and any(value.decode().lower() == expected.lower() for value in records[0][1].get('memberOf', [])))
+        except ldap.LDAPError:
+            return False
+        finally:
+            if conn:
+                conn.unbind_s()
+
     def get_user_info(self, username: str, admin_dn: str, admin_password: str) -> Optional[Dict]:
         """
         Get user information from FreeIPA.
@@ -112,7 +142,7 @@ class FreeIPAAuth:
             result = conn.search_s(
                 self.users_dn,
                 ldap.SCOPE_SUBTREE,
-                f"(uid={username})",
+                f"(uid={ldap.filter.escape_filter_chars(username)})",
                 ['uid', 'mail', 'displayName', 'memberOf']
             )
             
@@ -210,7 +240,7 @@ class FreeIPAAuth:
             result = conn.search_s(
                 self.groups_dn,
                 ldap.SCOPE_SUBTREE,
-                f"(cn={group_name})"
+                f"(cn={ldap.filter.escape_filter_chars(group_name)})"
             )
             
             exists = bool(result)
@@ -230,7 +260,7 @@ def create_auth_from_settings(settings: Dict) -> Optional[FreeIPAAuth]:
         settings: Dictionary with keys:
             - ldap_server: LDAP server hostname
             - ldap_base_dn: Base DN
-            - ldap_admin_group: Admin group name (optional, default: lrn-pxe-admins)
+            - ldap_admin_group: Admin group name (optional, default: dockyard-admins)
             
     Returns:
         FreeIPAAuth instance or None if required settings missing
@@ -244,5 +274,6 @@ def create_auth_from_settings(settings: Dict) -> Optional[FreeIPAAuth]:
     return FreeIPAAuth(
         server=settings['ldap_server'],
         base_dn=settings['ldap_base_dn'],
-        admin_group=settings.get('ldap_admin_group', 'lrn-pxe-admins')
+        admin_group=settings.get('ldap_admin_group', 'dockyard-admins')
     )
+

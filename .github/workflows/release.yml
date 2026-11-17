@@ -1,0 +1,43 @@
+name: Publish Dockyard release
+on:
+  push:
+    branches: [dockyard-release]
+permissions:
+  contents: write
+concurrency:
+  group: dockyard-release
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        rocky: [9, 10]
+    steps:
+      - uses: actions/checkout@v4
+      - run: CONTAINER_ENGINE=docker bash build.sh ${{ matrix.rocky }}
+      - name: Network-disabled install tests
+        run: CONTAINER_ENGINE=docker bash packaging/test-offline.sh ${{ matrix.rocky }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dockyard-el${{ matrix.rocky }}
+          path: releases/1.0.0/
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: dockyard-el*
+          path: releases/1.0.0/
+          merge-multiple: true
+      - name: Combine checksums
+        run: |
+          cd releases/1.0.0
+          sha256sum *.tar.gz el*/rpms/dockyard-*.rpm > SHA256SUMS
+      - name: Publish verified release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create dockyard-v1.0.0 --target "${{ github.sha }}" --title 'Dockyard 1.0.0' --notes-file RELEASE_NOTES.md releases/1.0.0/*.tar.gz releases/1.0.0/el*/rpms/dockyard-*.rpm releases/1.0.0/SHA256SUMS

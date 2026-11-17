@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LRN_PXE - Web Management Interface
+Dockyard - Web Management Interface
 Flask application for managing PXE boot images, kickstarts, and menus.
 """
 
@@ -9,6 +9,15 @@ import re
 import json
 import shutil
 import hashlib
+import ipaddress
+import tempfile
+import time
+import secrets
+import hmac
+from urllib.parse import quote
+from werkzeug.exceptions import HTTPException
+from werkzeug.security import check_password_hash
+from security import install_security, validate_menu, validate_settings, safe_leaf, confined
 import subprocess
 import threading
 from pathlib import Path
@@ -19,8 +28,8 @@ from flask import (
 )
 
 # ── Configuration ─────────────────────────────────────────────────────────────
-BASE_DIR    = os.environ.get("LRN_PXE_DIR", "/opt/lrn_pxe")
-PORT        = int(os.environ.get("LRN_PXE_PORT", 8080))
+BASE_DIR    = os.environ.get("DOCKYARD_DIR", "/var/lib/dockyard")
+PORT        = int(os.environ.get("DOCKYARD_PORT", 8080))
 ISOS_DIR    = os.path.join(BASE_DIR, "isos")
 KS_DIR      = os.path.join(BASE_DIR, "kickstarts")
 BOOT_DIR    = os.path.join(BASE_DIR, "boot")
@@ -30,7 +39,29 @@ MENU_JSON   = os.path.join(CONFIG_DIR, "menu.json")
 SETTINGS_JSON = os.path.join(CONFIG_DIR, "settings.json")
 
 app = Flask(__name__)
+install_security(app)
+
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024 * 1024  # 50 GB
+
+@app.before_request
+def validate_resource_names():
+    for key, value in (request.view_args or {}).items():
+        if key in ('iso_id', 'name', 'entry_id'):
+            safe_leaf(value)
+    if request.is_json and request.method in ('POST','PUT'):
+        body = request.get_json(silent=True)
+        if body is None:
+            abort(400)
+
+@app.errorhandler(ValueError)
+def validation_error(error):
+    return jsonify(error=str(error)), 400
+
+@app.errorhandler(HTTPException)
+def http_error(error):
+    if request.path.startswith('/api/'):
+        return jsonify(error=error.description), error.code
+    return error
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def load_json(path, default=None):
@@ -42,23 +73,32 @@ def load_json(path, default=None):
 
 def save_json(path, data):
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
+    fd, temporary = tempfile.mkstemp(prefix='.dockyard-', dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, 'w') as stream:
+            json.dump(data, stream, indent=2)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 def get_settings():
     return load_json(SETTINGS_JSON, {
         "server_ip": "127.0.0.1",
         "web_port": PORT,
-        "dhcp_enabled": True,
+        "boot_port": 8081,
+        "dhcp_enabled": False,
     })
 
 def get_menu():
-    return load_json(MENU_JSON, {
-        "title": "LRN_PXE Boot Menu",
+    return validate_menu(load_json(MENU_JSON, {
+        "title": "Dockyard Boot Menu",
         "timeout": 60,
         "default": "",
         "entries": []
-    })
+    }))
 
 def human_size(size_bytes):
     for unit in ["B", "KB", "MB", "GB", "TB"]:
@@ -123,13 +163,13 @@ def list_kickstarts():
 
 # ── iPXE Menu generator ───────────────────────────────────────────────────────
 def generate_ipxe_menu():
-    settings = get_settings()
+    settings = validate_settings(get_settings())
     menu     = get_menu()
     server   = settings.get("server_ip", "127.0.0.1")
-    port     = settings.get("web_port", PORT)
+    port     = settings.get("boot_port", 8081)
     base_url = f"http://{server}:{port}"
     # nginx serves on 80 and proxies; use port 80 for boot files
-    file_url = f"http://{server}"
+    file_url = f"http://{server}:{port}"
 
     lines = ["#!ipxe", ""]
     lines.append(f"set base_url {base_url}")
@@ -137,10 +177,11 @@ def generate_ipxe_menu():
     lines.append("")
 
     # Menu header
-    title = menu.get("title", "LRN_PXE Boot Menu")
+    title = menu.get("title", "Dockyard Boot Menu")
     timeout = menu.get("timeout", 60)
     default = menu.get("default", "")
 
+    lines.append(":menu")
     lines.append(f"menu {title}")
     lines.append("item --gap --  ────────────── Boot Images ──────────────")
 
@@ -196,9 +237,10 @@ def generate_ipxe_menu():
             lines.append(f"initrd {file_url}/boot/{iso_id}/initrd.img")
 
         lines.append("boot")
+        lines.append("goto menu")
         lines.append("")
 
-    lines += [":shell", "shell", "", ":reboot", "reboot", "", ":exit", "exit", ":menu", "goto menu"]
+    lines += [":shell", "shell", "goto menu", "", ":reboot", "reboot", "goto menu", "", ":exit", "exit"]
 
     return "\n".join(lines)
 
@@ -250,16 +292,24 @@ def _do_extract(iso_id, iso_path):
     os.makedirs(boot_path,  exist_ok=True)
 
     try:
-        # Mount ISO
-        result = subprocess.run(
-            ["mount", "-o", "loop,ro", iso_path, mount_path],
-            capture_output=True, text=True
-        )
-        if result.returncode != 0:
-            # Try without kernel module (copy approach)
-            EXTRACT_STATUS[iso_id]["message"] = "Extracting ISO contents..."
-            subprocess.run(["cp", "-r", "--no-preserve=ownership", iso_path, mount_path + "/"],
-                           check=False)
+        # Userspace ISO extraction avoids granting the web service mount privileges.
+        result = subprocess.run(['bsdtar', '-xf', iso_path, '-C', mount_path, '--no-same-owner', '--no-same-permissions'], capture_output=True, text=True, timeout=1800)
+        if result.returncode:
+            raise RuntimeError('ISO extraction failed; verify the image format and available disk space')
+        for root, dirs, files in os.walk(mount_path):
+            for name in dirs + files:
+                member = Path(root, name)
+                if member.is_symlink():
+                    target = member.resolve()
+                    try:
+                        target.relative_to(Path(mount_path).resolve())
+                    except ValueError:
+                        raise RuntimeError('ISO contains a link outside its extraction directory')
+            os.chmod(root, 0o755)
+            for name in files:
+                member = Path(root, name)
+                if member.is_file() and not member.is_symlink():
+                    os.chmod(member, 0o644)
 
         EXTRACT_STATUS[iso_id] = {"status": "running", "message": "Detecting OS type...", "progress": 40}
 
@@ -312,8 +362,8 @@ def dashboard():
         iso_count=len(isos), ks_count=len(ks_list),
         menu_count=len(menu.get("entries", [])),
         services={
-            "lrn-pxe":  service_status("lrn-pxe"),
-            "dnsmasq":  service_status("dnsmasq"),
+            "dockyard":  service_status("dockyard"),
+            "dnsmasq":  service_status("dockyard-dnsmasq"),
             "nginx":    service_status("nginx"),
         },
         disk=disk_info(),
@@ -373,8 +423,8 @@ def api_images_upload():
     if not file.filename.lower().endswith(".iso"):
         return jsonify({"error": "Only .iso files are supported"}), 400
 
-    filename = file.filename
-    dest = os.path.join(ISOS_DIR, filename)
+    filename = safe_leaf(file.filename, ".iso")
+    dest = str(confined(ISOS_DIR, filename))
     file.save(dest)
 
     iso_id = Path(filename).stem
@@ -398,8 +448,7 @@ def api_images_upload():
 @app.route("/api/images/<iso_id>", methods=["DELETE"])
 def api_images_delete(iso_id):
     # Remove ISO file
-    for f in Path(ISOS_DIR).glob(f"{iso_id}.*"):
-        f.unlink(missing_ok=True)
+    confined(ISOS_DIR, iso_id + ".iso").unlink(missing_ok=True)
     # Remove boot files
     boot_path = Path(BOOT_DIR) / iso_id
     if boot_path.exists():
@@ -413,6 +462,7 @@ def api_images_delete(iso_id):
     # Remove from menu
     menu = get_menu()
     menu["entries"] = [e for e in menu.get("entries", []) if e.get("iso_id") != iso_id]
+    validate_menu(menu)
     save_json(MENU_JSON, menu)
     return jsonify({"success": True})
 
@@ -430,13 +480,7 @@ def api_images_extract(iso_id):
 @app.route("/api/images/<iso_id>/extract/status", methods=["GET"])
 def api_images_extract_status(iso_id):
     status = EXTRACT_STATUS.get(iso_id, {"status": "unknown", "message": "No job found", "progress": 0})
-    # If done, enable the menu entry
-    if status.get("status") == "done":
-        menu = get_menu()
-        for entry in menu.get("entries", []):
-            if entry.get("iso_id") == iso_id:
-                entry["enabled"] = True
-        save_json(MENU_JSON, menu)
+    # Polling is read-only. Enabling a boot entry requires an explicit operator edit.
     return jsonify(status)
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -451,7 +495,10 @@ def api_ks_list():
 def api_ks_upload():
     if "file" in request.files:
         file = request.files["file"]
-        dest = os.path.join(KS_DIR, file.filename)
+        safe_leaf(file.filename)
+        if not file.filename.endswith((".ks", ".cfg", ".txt")):
+            abort(400)
+        dest = str(confined(KS_DIR, file.filename))
         file.save(dest)
         return jsonify({"success": True, "name": file.filename})
     elif request.is_json:
@@ -462,7 +509,7 @@ def api_ks_upload():
             return jsonify({"error": "Filename required"}), 400
         if not name.endswith((".ks", ".cfg")):
             name += ".ks"
-        dest = os.path.join(KS_DIR, name)
+        dest = str(confined(KS_DIR, safe_leaf(name)))
         with open(dest, "w") as f:
             f.write(content)
         return jsonify({"success": True, "name": name})
@@ -470,7 +517,7 @@ def api_ks_upload():
 
 @app.route("/api/kickstarts/<name>", methods=["GET"])
 def api_ks_read(name):
-    path = os.path.join(KS_DIR, name)
+    path = str(confined(KS_DIR, safe_leaf(name)))
     if not os.path.exists(path):
         return jsonify({"error": "Not found"}), 404
     with open(path) as f:
@@ -480,14 +527,14 @@ def api_ks_read(name):
 @app.route("/api/kickstarts/<name>", methods=["PUT"])
 def api_ks_update(name):
     data = request.get_json()
-    path = os.path.join(KS_DIR, name)
+    path = str(confined(KS_DIR, safe_leaf(name)))
     with open(path, "w") as f:
         f.write(data.get("content", ""))
     return jsonify({"success": True})
 
 @app.route("/api/kickstarts/<name>", methods=["DELETE"])
 def api_ks_delete(name):
-    path = os.path.join(KS_DIR, name)
+    path = str(confined(KS_DIR, safe_leaf(name)))
     if os.path.exists(path):
         os.unlink(path)
     return jsonify({"success": True})
@@ -502,7 +549,7 @@ def api_menu_get():
 
 @app.route("/api/menu", methods=["PUT"])
 def api_menu_save():
-    data = request.get_json()
+    data = validate_menu(request.get_json())
     save_json(MENU_JSON, data)
     return jsonify({"success": True})
 
@@ -517,6 +564,7 @@ def api_menu_add_entry():
         eid = eid + "-2"
     data["id"] = eid
     menu["entries"].append(data)
+    validate_menu(menu)
     save_json(MENU_JSON, menu)
     return jsonify({"success": True, "id": eid})
 
@@ -528,6 +576,7 @@ def api_menu_update_entry(entry_id):
         if entry.get("id") == entry_id:
             menu["entries"][i].update(data)
             break
+    validate_menu(menu)
     save_json(MENU_JSON, menu)
     return jsonify({"success": True})
 
@@ -535,6 +584,7 @@ def api_menu_update_entry(entry_id):
 def api_menu_delete_entry(entry_id):
     menu = get_menu()
     menu["entries"] = [e for e in menu.get("entries", []) if e.get("id") != entry_id]
+    validate_menu(menu)
     save_json(MENU_JSON, menu)
     return jsonify({"success": True})
 
@@ -544,6 +594,7 @@ def api_menu_reorder():
     menu = get_menu()
     id_to_entry = {e.get("id"): e for e in menu.get("entries", [])}
     menu["entries"] = [id_to_entry[i] for i in order if i in id_to_entry]
+    validate_menu(menu)
     save_json(MENU_JSON, menu)
     return jsonify({"success": True})
 
@@ -557,7 +608,7 @@ def api_settings_get():
 
 @app.route("/api/settings", methods=["PUT"])
 def api_settings_save():
-    data = request.get_json()
+    data = validate_settings(request.get_json())
     save_json(SETTINGS_JSON, data)
     return jsonify({"success": True})
 
@@ -569,8 +620,8 @@ def api_settings_save():
 def api_status():
     return jsonify({
         "services": {
-            "lrn-pxe":  service_status("lrn-pxe"),
-            "dnsmasq":  service_status("dnsmasq"),
+            "dockyard":  service_status("dockyard"),
+            "dnsmasq":  service_status("dockyard-dnsmasq"),
             "nginx":    service_status("nginx"),
         },
         "disk": disk_info(),
@@ -581,14 +632,10 @@ def api_status():
 
 @app.route("/api/service/<name>/restart", methods=["POST"])
 def api_service_restart(name):
-    allowed = {"dnsmasq", "nginx", "lrn-pxe"}
+    allowed = {"dnsmasq", "nginx", "dockyard"}
     if name not in allowed:
         return jsonify({"error": "Not allowed"}), 403
-    try:
-        subprocess.run(["systemctl", "restart", name], check=True, timeout=15)
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    return jsonify({"error": "Service restarts require an administrator on the server. Use sudo systemctl restart with the reviewed service name."}), 409
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -596,4 +643,5 @@ if __name__ == "__main__":
     # Ensure directories exist
     for d in [ISOS_DIR, KS_DIR, BOOT_DIR, MOUNTS_DIR, CONFIG_DIR]:
         os.makedirs(d, exist_ok=True)
-    app.run(host="0.0.0.0", port=PORT, debug=False, threaded=True)
+    app.run(host="127.0.0.1", port=PORT, debug=False, threaded=True)
+
