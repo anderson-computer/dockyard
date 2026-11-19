@@ -44,5 +44,5 @@ online repositories. See `packaging/IPXE_COMMIT` for the iPXE revision; its full
 source archive is included with the application. Physical BIOS/UEFI and site
 LDAP/SELinux qualification remain deployment checks. RPMs are unsigned.
 
-Source copyright remains with its owner. No new open-source license grant is
-inferred from the original repository. Third-party components retain their own licenses.
+Dockyard is released under the MIT License (see `LICENSE`). Third-party
+components retain their own licenses; see `THIRD_PARTY_NOTICES.md`.
