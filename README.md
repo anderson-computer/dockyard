@@ -8,6 +8,12 @@ kickstart editing and BIOS/UEFI iPXE menu generation. The management service
 runs without root privileges and listens on loopback. DHCP/TFTP and boot HTTP
 are configured and activated explicitly by a server administrator.
 
+![Dockyard dashboard](docs/images/dockyard-dashboard.png)
+
+![Dockyard kickstart files page](docs/images/dockyard-kickstarts.png)
+
+*Screenshots: Dockyard 1.0.0 running its authenticated development preview with sample kickstart files (no boot images, no real network).*
+
 ## Install
 
 Use the complete Rocky 9 or 10 x86_64 offline bundle from the repository's
