@@ -8,6 +8,8 @@ kickstart editing and BIOS/UEFI iPXE menu generation. The management service
 runs without root privileges and listens on loopback. DHCP/TFTP and boot HTTP
 are configured and activated explicitly by a server administrator.
 
+**Who it's for:** Server administrators who provision machines over the network (PXE) from a Rocky Linux 9 or 10 server and want managed ISOs, kickstarts and BIOS/UEFI iPXE menus.
+
 ## Install
 
 Use the complete Rocky 9 or 10 x86_64 offline bundle from the repository's
@@ -46,3 +48,7 @@ LDAP/SELinux qualification remain deployment checks. RPMs are unsigned.
 
 Source copyright remains with its owner. No new open-source license grant is
 inferred from the original repository. Third-party components retain their own licenses.
+
+---
+
+**Part of the Cyber Chief toolkit** by Anderson Computer. Sibling projects: [Flagship](https://github.com/mike0615/flagship) · [Flagship Web](https://github.com/mike0615/flagship-web) · [Porthole](https://github.com/mike0615/porthole) · [Skiff](https://github.com/mike0615/skiff) · [Sonar](https://github.com/mike0615/sonar) · [Helm RDP](https://github.com/mike0615/helm-rdp) · [Pathfinder](https://github.com/mike0615/pathfinder) · [FleetOps](https://github.com/mike0615/fleet-ops) · [CommShack](https://github.com/mike0615/commshack).
